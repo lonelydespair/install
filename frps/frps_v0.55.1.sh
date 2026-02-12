@@ -11,7 +11,7 @@ export FRPS_INIT="https://raw.githubusercontent.com/mvscode/frps-onekey/master/f
 export gitee_download_url="https://gitee.com/mvscode/frps-onekey/releases/download"
 export github_download_url="https://github.com/fatedier/frp/releases/download"
 export gitee_latest_version_api="https://gitee.com/api/v5/repos/mvscode/frps-onekey/releases/latest"
-export github_latest_version_api="https://api.github.com/repos/fatedier/frp/releases/tags/v0.68.0"   #更换安装版本
+export github_latest_version_api="https://api.github.com/repos/fatedier/frp/releases/tags/v0.55.1"   #更换安装版本
 
 # Program information
 program_name="frps"
