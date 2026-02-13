@@ -120,7 +120,7 @@ get_installed_version() {
     if [ -x "/root/hy3/hysteria-linux-$arch" ]; then
         version="$("/root/hy3/hysteria-linux-$arch" version | grep Version | grep -o 'v[.0-9]*')"
     else
-        version="你还没有安装,老登"
+        version="你还没有安装"
     fi
 }
 
@@ -237,7 +237,7 @@ fi
 if [[ $(uname -m) =~ ^(x86_64|amd64) ]]; then
   echo "正在安装中,请稍后……"
 else
-  echo "系统架构不是 x86/amd64,牢弟,买个好点的吧"
+  echo "系统架构不是 x86/amd64"
   exit 1
 fi
 
@@ -435,7 +435,7 @@ hy2easy
 welcome
 
 #这些就行提示你输入的😇
-echo "$(random_color '选择一个操作，小崽子(ง ื▿ ื)ว：')"
+echo "$(random_color '选择一个操作(ง ื▿ ื)ว：')"
 echo -e "$(random_color '输入hy2快捷启动脚本')"
 echo "1. 安装(以梦为马)"
 echo "2. 卸载(以心为疆)"
@@ -460,8 +460,8 @@ case $choice in
    2)
 
 uninstall_hysteria > /dev/null 2>&1
-echo -e "$(random_color '你别急,别急,正在卸载......')"
-echo -e "$(random_color '卸载完成,老登ψ(｀∇´)ψ！')"
+echo -e "$(random_color '正在卸载......')"
+echo -e "$(random_color '卸载完成ψ(｀∇´)ψ！')"
 
      exit
      ;;
@@ -497,7 +497,7 @@ get_updated_version() {
     if [ -x "/root/hy3/hysteria-linux-$arch" ]; then
         version2="$("/root/hy3/hysteria-linux-$arch" version | grep Version | grep -o 'v[.0-9]*')"
     else
-        version2="你还没有安装,老登"
+        version2="你还没有安装"
     fi
 }
 
@@ -532,12 +532,12 @@ fi
 systemctl stop hysteria.service
 systemctl start hysteria.service
 
-echo "更新完成,不是哥们,你有什么实力,你直接给我坐下(ง ื▿ ื)ว."
+echo "更新完成(ง ื▿ ื)ว."
 }
-echo "$(random_color '正在更新中,别急,老登')"
+echo "$(random_color '正在更新中')"
 sleep 1
 updatehy2 > /dev/null 2>&1
-echo "$(random_color '更新完成,老登')"
+echo "$(random_color '更新完成')"
 get_updated_version
 echo "您当前的更新后hy2版本:$version2"
 
@@ -592,14 +592,14 @@ fi
 
 esac
 
-echo "$(random_color '别急,别急,别急,老登')"
+echo "$(random_color '别急')"
 sleep 1
 
 if [ "$hy2zt" = "运行中" ]; then
   echo "Hysteria 正在运行，请先卸载再安装。"
   exit 1
 else
-  echo "原神,启动。"
+  echo "启动"
 fi
 
 uninstall_hysteria > /dev/null 2>&1
@@ -628,7 +628,7 @@ installhy2 () {
   echo "Download URL: $DOWNLOAD_URL"
 }
 
-echo "$(random_color '正在下载中,老登( ﾟдﾟ)つBye')"
+echo "$(random_color '正在下载中( ﾟдﾟ)つBye')"
 sleep 1
 installhy2 > /dev/null 2>&1
 
@@ -673,7 +673,7 @@ while true; do
     elif [ "$port" -eq 0 ]; then
       port=$((RANDOM % 58001 + 2000))
     elif ! [[ "$port" =~ ^[0-9]+$ ]]; then
-      echo "$(random_color '我的动物朋友，请输入数字好吧，请重新输入端口号：')"
+      echo "$(random_color '请重新输入端口号：')"
       continue
     fi
   
@@ -763,20 +763,20 @@ while true; do
   case $choice in
     1)
       get_ipv4_info
-      echo "老登你的IP 地址为：$ipwan"
+      echo "你的IP 地址为：$ipwan"
       ipta="iptables"
       break
       ;;
     2)
       get_ipv6_info
-      echo "老登你的IP 地址为：$ipwan"
+      echo "你的IP 地址为：$ipwan"
       ipta="ip6tables"
       break
       ;;
     "")
       echo "使用默认的 IPv4 模式。"
       get_ipv4_info
-      echo "老登你的IP 地址为：$ipwan"
+      echo "你的IP 地址为：$ipwan"
       ipta="iptables"
       break
       ;;
@@ -1042,7 +1042,7 @@ echo "
 "
 echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
 
-echo "$(random_color '老登,马上,马上了------')"
+echo "$(random_color '马上,马上了------')"
 sleep 2
 
 echo "$(random_color '
@@ -1054,13 +1054,13 @@ echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
 
 if [ -n "$start_port" ] && [ -n "$end_port" ]; then
 
-  echo -e "$(random_color '这是你的Hysteria2节点链接信息，请注意保存哦joker(老登，请使用最新版的neko哦): ')\nhysteria2://$password@$ipwan$domain:$port/?${ovokk}mport=$port,$start_port-$end_port&sni=$domain$domain_name#Hysteria2"
+  echo -e "$(random_color '这是你的Hysteria2节点链接信息，请注意保存哦joker(请使用最新版的neko哦): ')\nhysteria2://$password@$ipwan$domain:$port/?${ovokk}mport=$port,$start_port-$end_port&sni=$domain$domain_name#Hysteria2"
   
   echo "hysteria2://$password@$ipwan$domain:$port/?${ovokk}mport=$port,$start_port-$end_port&sni=$domain$domain_name#Hysteria2" > neko.txt
   
 else
 
-  echo -e "$(random_color '这是你的Hysteria2节点链接信息，请注意保存哦小崽子: ')\nhysteria2://$password@$ipwan$domain:$port/?${ovokk}sni=$domain$domain_name#Hysteria2"
+  echo -e "$(random_color '这是你的Hysteria2节点链接信息，请注意保存哦: ')\nhysteria2://$password@$ipwan$domain:$port/?${ovokk}sni=$domain$domain_name#Hysteria2"
   
   echo "hysteria2://$password@$ipwan$domain:$port/?${ovokk}sni=$domain$domain_name#Hysteria2" > neko.txt
   
@@ -1068,4 +1068,4 @@ fi
 
 echo -e "$(random_color '
 
-Hysteria2安装成功，请合理使用哦,你直直-——直直接给我坐下')"
+Hysteria2安装成功，请合理使用哦')"
