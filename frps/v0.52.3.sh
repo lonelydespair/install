@@ -9,13 +9,13 @@ export FRPS_VER="$LATEST_RELEASE"
 export FRPS_VER_32BIT="$LATEST_RELEASE"
 export FRPS_INIT="https://raw.githubusercontent.com/mvscode/frps-onekey/master/frps.init"
 export gitee_download_url="https://gitee.com/mvscode/frps-onekey/releases/download"
-export github_download_url="https://github.com/fatedier/frp/releases/download"
+export github_download_url="https://github.com/mvscode/frps-onekey/releases/download"
 export gitee_latest_version_api="https://gitee.com/api/v5/repos/mvscode/frps-onekey/releases/latest"
-export github_latest_version_api="https://api.github.com/repos/fatedier/frp/releases/tags/v0.68.0"   #更换安装版本
+export github_latest_version_api="https://api.github.com/repos/fatedier/frp/releases/tags/v0.52.3"   #更换安装版本
 
 # Program information
 program_name="frps"
-version="1.0.7"
+version="2.0.1"
 str_program_dir="/usr/local/${program_name}"
 program_init="/etc/init.d/${program_name}"
 program_config_file="frps.toml"
@@ -34,9 +34,9 @@ shell_update() {
     remote_shell_version=$(wget --no-check-certificate -qO- "${str_install_shell}" | sed -n '/^version/p' | cut -d'"' -f2)
 
 	# Check if the local version is lower than the remote version
-	if [[ "${version}" < "${remote_shell_version}" ]]; then
+	if [[ "$(printf '%s\n' "${version}" "${remote_shell_version}" | sort -V | tail -n1)" == "${remote_shell_version}" ]] && [[ "${version}" != "${remote_shell_version}" ]]; then
 	# Echo a message to indicate that a new version has been found
-	echo -e "${COLOR_YELOW}Found a newer version!${COLOR_END}"
+	echo -e "${COLOR_YELLOW}Found a newer version!${COLOR_END}"
 	echo
 	# Echo the local and remote versions
 	echo -e "${COLOR_BLUE}Local version: ${version}${COLOR_END}"
@@ -69,7 +69,7 @@ shell_update() {
     else
 	# If user chooses not to update, continue with the script
 	    echo
-	    echo -e "${COLOR_YELOW}Continuing with the current script...${COLOR_END}"
+	    echo -e "${COLOR_YELLOW}Continuing with the current script...${COLOR_END}"
 	fi
 fi
 }
@@ -89,7 +89,7 @@ fun_frps(){
 fun_set_text_color(){
     COLOR_RED='\E[1;31m'
     COLOR_GREEN='\E[1;32m'
-    COLOR_YELOW='\E[1;33m'
+    COLOR_YELLOW='\E[1;33m'
     COLOR_BLUE='\E[1;34m'
     COLOR_PINK='\E[1;35m'
     COLOR_PINKBACK_WHITEFONT='\033[45;37m'
@@ -241,7 +241,7 @@ fun_getServer(){
             ;;
     esac
     echo    "-----------------------------------"
-    echo -e "       Your select: ${COLOR_YELOW}${set_server_url}${COLOR_END}    "
+    echo -e "       Your select: ${COLOR_YELLOW}${set_server_url}${COLOR_END}    "
     echo    "-----------------------------------"
 }
 fun_getVer(){
@@ -270,7 +270,7 @@ fun_download_file(){
         rm -fr ${program_latest_filename} frp_${FRPS_VER}_linux_${ARCHS}
 	echo -e "Downloading ${program_name}..."
 	echo ""
-        curl -L --progress-bar "${program_latest_file_url}" -o "${program_latest_filename}" 2>&1 | show_progress
+        wget -q --no-check-certificate --show-progress --progress=bar:force:noscroll -O "${program_latest_filename}" "${program_latest_file_url}" 2>&1
 	echo ""		
 	if [ $? -ne 0 ]; then
         echo -e " ${COLOR_RED}Download failed${COLOR_END}"
@@ -298,48 +298,6 @@ fun_download_file(){
       exit 1
     fi
 }
-# Helper function to format the progress bar
-show_progress() {
-  local TOTAL_SIZE=1000000  # Assume total size is 1000000 bytes
-  local CURRENT_SIZE=0   # Initial download size is 0 bytes
-  local GREEN='\033[1;32m'
-  local NC='\033[0m'  # No Color
-
-  while [ $CURRENT_SIZE -lt $TOTAL_SIZE ] || [ $PERCENTAGE -lt 100 ]; do
-    PERCENTAGE=$(awk "BEGIN {printf \"%.0f\", $CURRENT_SIZE*100/$TOTAL_SIZE}")
-
-    if ! [[ "$PERCENTAGE" =~ ^[0-9]+$ ]] ; then
-      PERCENTAGE=0
-    fi
-
-    local completed=$((PERCENTAGE / 2))
-    local remaining=$((50 - completed))
-
-    if [ $PERCENTAGE -eq 100 ]; then
-      completed=50
-      remaining=0
-    fi
-
-    printf "\r${GREEN}%2d%% [" "$PERCENTAGE"
-    for ((i = 0; i < completed; i++)); do
-     if [ $i -eq $((completed - 1)) ]; then
-      printf ">"
-     else
-      printf "="
-     fi
-    done
-    for ((i = 0; i < remaining; i++)); do
-      printf " "
-    done
-      printf "]${NC}"
-
-    CURRENT_SIZE=$((CURRENT_SIZE + $((RANDOM % 50000 + 1))))
-    sleep 0.05
-  done
-
-  echo -e "\nDownload complete!"
-}
-
 function __readINI() {
  INIFILE=$1; SECTION=$2; ITEM=$3
  _readIni=`awk -F '=' '/\['$SECTION'\]/{a=1}a==1&&$1~/'$ITEM'/{print $2;exit}' $INIFILE`
@@ -468,7 +426,7 @@ fun_input_kcp_bind_port(){
     echo -n -e "Please input ${program_name} ${COLOR_GREEN}kcp_bind_port${COLOR_END} [1-65535]"
     read -e -p "(Default kcp bind port: ${def_kcp_bind_port}):" input_kcp_bind_port
     [ -z "${input_kcp_bind_port}" ] && input_kcp_bind_port="${def_kcp_bind_port}"
-    fun_check_port "input_kcp_bind_port" "${input_kcp_bind_port}"
+    fun_check_port "kcp_bind_port" "${input_kcp_bind_port}"
 }
 fun_input_quic_bind_port(){
     def_quic_bind_port="${input_vhost_https_port}"
@@ -476,7 +434,15 @@ fun_input_quic_bind_port(){
     echo -n -e "Please input ${program_name} ${COLOR_GREEN}quic_bind_port${COLOR_END} [1-65535]"
     read -e -p "(Default quic bind port: ${def_quic_bind_port}):" input_quic_bind_port
     [ -z "${input_quic_bind_port}" ] && input_quic_bind_port="${def_quic_bind_port}"
-    fun_check_port "input_quic_bind_port" "${input_quic_bind_port}"
+    fun_check_port "quic_bind_port" "${input_quic_bind_port}"
+}
+fun_input_ssh_tunnel_gateway_bind_port(){
+    def_ssh_tunnel_gateway_bind_port="2200"
+    echo ""
+    echo -n -e "Please input ${program_name} ${COLOR_GREEN}sshTunnelGateway.bindPort${COLOR_END} [1-65535]"
+    read -e -p "(Default ssh tunnel gateway bind port: ${def_ssh_tunnel_gateway_bind_port}):" input_ssh_tunnel_gateway_bind_port
+    [ -z "${input_ssh_tunnel_gateway_bind_port}" ] && input_ssh_tunnel_gateway_bind_port="${def_ssh_tunnel_gateway_bind_port}"
+    fun_check_port "ssh_tunnel_gateway_bind_port" "${input_ssh_tunnel_gateway_bind_port}"
 }
 pre_install_frps(){
     fun_frps
@@ -488,7 +454,7 @@ pre_install_frps(){
     if pgrep -x "${program_name}" >/dev/null; then
     echo -e "${COLOR_GREEN}${program_name} is already installed and running.${COLOR_END}"
 else
-    echo -e "${COLOR_YELOW}${program_name} is not running or not install.${COLOR_END}"
+    echo -e "${COLOR_YELLOW}${program_name} is not running or not install.${COLOR_END}"
     echo ""
     read -p "Do you want to re-install ${program_name}? (y/n) " choice
 	echo ""
@@ -497,12 +463,12 @@ else
         echo -e "${COLOR_GREEN} Re-installing ${program_name}...${COLOR_END}"
         ;;
       n|N)
-        echo -e "${COLOR_YELOW} Skipping installation.${COLOR_END}"
+        echo -e "${COLOR_YELLOW} Skipping installation.${COLOR_END}"
 		echo ""
 		exit 1
         ;;
       *)
-        echo -e "${COLOR_YELOW}Invalid choice. Skipping installation. ${COLOR_END}"
+        echo -e "${COLOR_YELLOW}Invalid choice. Skipping installation. ${COLOR_END}"
 		echo ""
 		exit 1
         ;;
@@ -521,39 +487,39 @@ else
         echo -e "————————————————————————————————————————————"
         fun_input_bind_port
         [ -n "${input_port}" ] && set_bind_port="${input_port}"
-        echo -e "${program_name} bind_port: ${COLOR_YELOW}${set_bind_port}${COLOR_END}"
+        echo -e "${program_name} bind_port: ${COLOR_YELLOW}${set_bind_port}${COLOR_END}"
         echo -e ""
         fun_input_vhost_http_port
         [ -n "${input_port}" ] && set_vhost_http_port="${input_port}"
-        echo -e "${program_name} vhost_http_port: ${COLOR_YELOW}${set_vhost_http_port}${COLOR_END}"
+        echo -e "${program_name} vhost_http_port: ${COLOR_YELLOW}${set_vhost_http_port}${COLOR_END}"
         echo -e ""
         fun_input_vhost_https_port
         [ -n "${input_port}" ] && set_vhost_https_port="${input_port}"
-        echo -e "${program_name} vhost_https_port: ${COLOR_YELOW}${set_vhost_https_port}${COLOR_END}"
+        echo -e "${program_name} vhost_https_port: ${COLOR_YELLOW}${set_vhost_https_port}${COLOR_END}"
         echo -e ""
         fun_input_dashboard_port
         [ -n "${input_port}" ] && set_dashboard_port="${input_port}"
-        echo -e "${program_name} dashboard_port: ${COLOR_YELOW}${set_dashboard_port}${COLOR_END}"
+        echo -e "${program_name} dashboard_port: ${COLOR_YELLOW}${set_dashboard_port}${COLOR_END}"
         echo -e ""
         fun_input_dashboard_user
         [ -n "${input_dashboard_user}" ] && set_dashboard_user="${input_dashboard_user}"
-        echo -e "${program_name} dashboard_user: ${COLOR_YELOW}${set_dashboard_user}${COLOR_END}"
+        echo -e "${program_name} dashboard_user: ${COLOR_YELLOW}${set_dashboard_user}${COLOR_END}"
         echo -e ""
         fun_input_dashboard_pwd
         [ -n "${input_dashboard_pwd}" ] && set_dashboard_pwd="${input_dashboard_pwd}"
-        echo -e "${program_name} dashboard_pwd: ${COLOR_YELOW}${set_dashboard_pwd}${COLOR_END}"
+        echo -e "${program_name} dashboard_pwd: ${COLOR_YELLOW}${set_dashboard_pwd}${COLOR_END}"
         echo -e ""
         fun_input_token
         [ -n "${input_token}" ] && set_token="${input_token}"
-        echo -e "${program_name} token: ${COLOR_YELOW}${set_token}${COLOR_END}"
+        echo -e "${program_name} token: ${COLOR_YELLOW}${set_token}${COLOR_END}"
         echo -e ""
         fun_input_subdomain_host
         [ -n "${input_subdomain_host}" ] && set_subdomain_host="${input_subdomain_host}"
-        echo -e "${program_name} subdomain_host: ${COLOR_YELOW}${set_subdomain_host}${COLOR_END}"
+        echo -e "${program_name} subdomain_host: ${COLOR_YELLOW}${set_subdomain_host}${COLOR_END}"
         echo -e ""
         fun_input_max_pool_count
         [ -n "${input_number}" ] && set_max_pool_count="${input_number}"
-        echo -e "${program_name} max_pool_count: ${COLOR_YELOW}${set_max_pool_count}${COLOR_END}"
+        echo -e "${program_name} max_pool_count: ${COLOR_YELLOW}${set_max_pool_count}${COLOR_END}"
         echo -e ""
         echo -e "Please select ${COLOR_GREEN}log_level${COLOR_END}"
         echo    "1: info (default)"
@@ -586,11 +552,11 @@ else
 				str_log_level="info"
 				;;
 		esac
-		echo -e "log_level: ${COLOR_YELOW}${str_log_level}${COLOR_END}"
+		echo -e "log_level: ${COLOR_YELLOW}${str_log_level}${COLOR_END}"
 		echo -e ""
         fun_input_log_max_days
         [ -n "${input_number}" ] && set_log_max_days="${input_number}"
-        echo -e "${program_name} log_max_days: ${COLOR_YELOW}${set_log_max_days}${COLOR_END}"
+        echo -e "${program_name} log_max_days: ${COLOR_YELLOW}${set_log_max_days}${COLOR_END}"
         echo -e ""
         echo -e "Please select ${COLOR_GREEN}log_file${COLOR_END}"
         echo    "1: enable (default)"
@@ -614,7 +580,7 @@ else
                 str_log_file_flag="enable"
                 ;;
         esac
-        echo -e "log_file: ${COLOR_YELOW}${str_log_file_flag}${COLOR_END}"
+        echo -e "log_file: ${COLOR_YELLOW}${str_log_file_flag}${COLOR_END}"
         echo -e ""
         echo -e "Please select ${COLOR_GREEN}tcp_mux${COLOR_END}"
         echo    "1: enable (default)"
@@ -635,7 +601,7 @@ else
                 set_tcp_mux="true"
                 ;;
         esac
-        echo -e "tcp_mux: ${COLOR_YELOW}${set_tcp_mux}${COLOR_END}"
+        echo -e "tcp_mux: ${COLOR_YELLOW}${set_tcp_mux}${COLOR_END}"
         echo -e ""
         echo -e "Please select ${COLOR_GREEN}transport protocol support${COLOR_END}"
         echo    "1: enable (default)"
@@ -647,11 +613,11 @@ else
                 set_transport_protocol="enable"
 				fun_input_kcp_bind_port
         [ -n "${input_port}" ] && set_kcp_bind_port="${input_kcp_bind_port}"
-        echo -e "${program_name} kcp_bind_port: ${COLOR_YELOW}${set_kcp_bind_port}${COLOR_END}"
+        echo -e "${program_name} kcp_bind_port: ${COLOR_YELLOW}${set_kcp_bind_port}${COLOR_END}"
         echo -e ""
 			    fun_input_quic_bind_port
         [ -n "${input_port}" ] && set_quic_bind_port="${input_quic_bind_port}"
-        echo -e "${program_name} quic_bind_port: ${COLOR_YELOW}${set_quic_bind_port}${COLOR_END}"
+        echo -e "${program_name} quic_bind_port: ${COLOR_YELLOW}${set_quic_bind_port}${COLOR_END}"
         echo -e ""
                 ;;
             0|2|[nN]|[nN][oO]|[oO][fF][fF]|[fF][aA][lL][sS][eE]|[dD][iI][sS][aA][bB][lL][eE])
@@ -666,15 +632,127 @@ else
                 set_transport_protocol="enable"
 				fun_input_kcp_bind_port
         [ -n "${input_port}" ] && set_kcp_bind_port="${input_kcp_bind_port}"
-        echo -e "${program_name} kcp_bind_port: ${COLOR_YELOW}${set_kcp_bind_port}${COLOR_END}"
+        echo -e "${program_name} kcp_bind_port: ${COLOR_YELLOW}${set_kcp_bind_port}${COLOR_END}"
         echo -e ""
 			    fun_input_quic_bind_port
         [ -n "${input_port}" ] && set_quic_bind_port="${input_quic_bind_port}"
-        echo -e "${program_name} quic_bind_port: ${COLOR_YELOW}${set_quic_bind_port}${COLOR_END}"
+        echo -e "${program_name} quic_bind_port: ${COLOR_YELLOW}${set_quic_bind_port}${COLOR_END}"
         echo -e ""
                 ;;
         esac
-        echo -e "transport protocol support: ${COLOR_YELOW}${set_transport_protocol}${COLOR_END}"
+        echo -e "transport protocol support: ${COLOR_YELLOW}${set_transport_protocol}${COLOR_END}"
+        echo -e ""
+        echo -e "Please select ${COLOR_GREEN}SSH Tunnel Gateway${COLOR_END}"
+        echo    "1: enable"
+        echo    "2: disable (default)"
+        echo "-------------------------"
+        read -e -p "Enter your choice (1, 2 or exit. default [2]): " str_ssh_tunnel_gateway
+        case "${str_ssh_tunnel_gateway}" in
+            1|[yY]|[yY][eE][sS]|[oO][nN]|[tT][rR][uU][eE]|[eE][nN][aA][bB][lL][eE])
+                set_ssh_tunnel_gateway="enable"
+                fun_input_ssh_tunnel_gateway_bind_port
+                [ -n "${input_port}" ] && set_ssh_tunnel_gateway_bind_port="${input_ssh_tunnel_gateway_bind_port}"
+                echo -e "${program_name} sshTunnelGateway.bindPort: ${COLOR_YELLOW}${set_ssh_tunnel_gateway_bind_port}${COLOR_END}"
+                echo -e ""
+                echo -n -e "Please input ${program_name} ${COLOR_GREEN}sshTunnelGateway.privateKeyFile${COLOR_END}"
+                read -e -p "(Leave empty to auto-generate):" input_ssh_private_key_file
+                set_ssh_private_key_file="${input_ssh_private_key_file}"
+                echo -e "${program_name} sshTunnelGateway.privateKeyFile: ${COLOR_YELLOW}${set_ssh_private_key_file:-auto}${COLOR_END}"
+                echo -e ""
+                echo -n -e "Please input ${program_name} ${COLOR_GREEN}sshTunnelGateway.authorizedKeysFile${COLOR_END}"
+                read -e -p "(Leave empty to allow all):" input_ssh_authorized_keys_file
+                set_ssh_authorized_keys_file="${input_ssh_authorized_keys_file}"
+                echo -e "${program_name} sshTunnelGateway.authorizedKeysFile: ${COLOR_YELLOW}${set_ssh_authorized_keys_file:-none}${COLOR_END}"
+                echo -e ""
+                ;;
+            0|2|[nN]|[nN][oO]|[oO][fF][fF]|[fF][aA][lL][sS][eE]|[dD][iI][sS][aA][bB][lL][eE]|"")
+                set_ssh_tunnel_gateway="disable"
+                set_ssh_tunnel_gateway_bind_port=0
+                set_ssh_private_key_file=""
+                set_ssh_authorized_keys_file=""
+                ;;
+            [eE][xX][iI][tT])
+                exit 1
+                ;;
+            *)
+                set_ssh_tunnel_gateway="disable"
+                set_ssh_tunnel_gateway_bind_port=0
+                set_ssh_private_key_file=""
+                set_ssh_authorized_keys_file=""
+                ;;
+        esac
+        echo -e "SSH Tunnel Gateway: ${COLOR_YELLOW}${set_ssh_tunnel_gateway}${COLOR_END}"
+        echo -e ""
+        echo -e "Please select ${COLOR_GREEN}webServer TLS (Dashboard HTTPS)${COLOR_END}"
+        echo    "1: enable"
+        echo    "2: disable (default)"
+        echo "-------------------------"
+        read -e -p "Enter your choice (1, 2 or exit. default [2]): " str_webserver_tls
+        case "${str_webserver_tls}" in
+            1|[yY]|[yY][eE][sS]|[oO][nN]|[tT][rR][uU][eE]|[eE][nN][aA][bB][lL][eE])
+                set_webserver_tls="enable"
+                echo ""
+                echo -n -e "Please input ${program_name} ${COLOR_GREEN}webServer.tls.certFile${COLOR_END} path"
+                read -e -p "(e.g. /etc/pki/tls/frp/frps/frps.crt):" input_webserver_tls_cert_file
+                [ -z "${input_webserver_tls_cert_file}" ] && input_webserver_tls_cert_file="/etc/pki/tls/frp/frps/frps.crt"
+                set_webserver_tls_cert_file="${input_webserver_tls_cert_file}"
+                echo -e "${program_name} webServer.tls.certFile: ${COLOR_YELLOW}${set_webserver_tls_cert_file}${COLOR_END}"
+                echo ""
+                echo -n -e "Please input ${program_name} ${COLOR_GREEN}webServer.tls.keyFile${COLOR_END} path"
+                read -e -p "(e.g. /etc/pki/tls/frp/frps/frps.key):" input_webserver_tls_key_file
+                [ -z "${input_webserver_tls_key_file}" ] && input_webserver_tls_key_file="/etc/pki/tls/frp/frps/frps.key"
+                set_webserver_tls_key_file="${input_webserver_tls_key_file}"
+                echo -e "${program_name} webServer.tls.keyFile: ${COLOR_YELLOW}${set_webserver_tls_key_file}${COLOR_END}"
+                echo ""
+                # Validate that the cert and key files exist; offer to auto-generate if missing
+                if [ ! -f "${set_webserver_tls_cert_file}" ] || [ ! -f "${set_webserver_tls_key_file}" ]; then
+                    echo -e "${COLOR_YELLOW}Warning: TLS cert or key file not found.${COLOR_END}"
+                    echo -e "  cert: ${set_webserver_tls_cert_file}"
+                    echo -e "  key:  ${set_webserver_tls_key_file}"
+                    echo ""
+                    read -e -p "Auto-generate a self-signed certificate? [Y/n]: " gen_cert_choice
+                    if [[ -z "${gen_cert_choice}" || "${gen_cert_choice}" =~ ^[Yy] ]]; then
+                        cert_dir=$(dirname "${set_webserver_tls_cert_file}")
+                        key_dir=$(dirname "${set_webserver_tls_key_file}")
+                        mkdir -p "${cert_dir}" "${key_dir}"
+                        echo -e "Generating self-signed TLS certificate..."
+                        if openssl req -x509 -newkey rsa:2048 \
+                            -keyout "${set_webserver_tls_key_file}" \
+                            -out "${set_webserver_tls_cert_file}" \
+                            -days 3650 -nodes \
+                            -subj "/CN=${defIP:-localhost}" \
+                            -addext "subjectAltName=IP:${defIP:-127.0.0.1},DNS:localhost" \
+                            2>/dev/null; then
+                            echo -e "${COLOR_GREEN}Self-signed certificate generated successfully.${COLOR_END}"
+                        else
+                            echo -e "${COLOR_RED}Failed to generate certificate. Please provide valid cert and key files.${COLOR_END}"
+                            set_webserver_tls="disable"
+                            set_webserver_tls_cert_file=""
+                            set_webserver_tls_key_file=""
+                        fi
+                    else
+                        echo -e "${COLOR_RED}TLS cert/key files are required. Disabling webServer TLS.${COLOR_END}"
+                        set_webserver_tls="disable"
+                        set_webserver_tls_cert_file=""
+                        set_webserver_tls_key_file=""
+                    fi
+                fi
+                ;;
+            0|2|[nN]|[nN][oO]|[oO][fF][fF]|[fF][aA][lL][sS][eE]|[dD][iI][sS][aA][bB][lL][eE]|"")
+                set_webserver_tls="disable"
+                set_webserver_tls_cert_file=""
+                set_webserver_tls_key_file=""
+                ;;
+            [eE][xX][iI][tT])
+                exit 1
+                ;;
+            *)
+                set_webserver_tls="disable"
+                set_webserver_tls_cert_file=""
+                set_webserver_tls_key_file=""
+                ;;
+        esac
+        echo -e "webServer TLS: ${COLOR_YELLOW}${set_webserver_tls}${COLOR_END}"
         echo -e ""
 
         echo "============== Check your input =============="
@@ -695,6 +773,17 @@ else
         echo -e "transport protocol : ${COLOR_GREEN}${set_transport_protocol}${COLOR_END}"
         echo -e "kcp bind port      : ${COLOR_GREEN}${set_kcp_bind_port}${COLOR_END}"
         echo -e "quic bind port     : ${COLOR_GREEN}${set_quic_bind_port}${COLOR_END}"
+        echo -e "SSH Tunnel Gateway : ${COLOR_GREEN}${set_ssh_tunnel_gateway}${COLOR_END}"
+        if [ "${set_ssh_tunnel_gateway}" == "enable" ]; then
+        echo -e "SSH tunnel port    : ${COLOR_GREEN}${set_ssh_tunnel_gateway_bind_port}${COLOR_END}"
+        echo -e "SSH private key    : ${COLOR_GREEN}${set_ssh_private_key_file:-auto}${COLOR_END}"
+        echo -e "SSH authorized keys: ${COLOR_GREEN}${set_ssh_authorized_keys_file:-none}${COLOR_END}"
+        fi
+        echo -e "webServer TLS      : ${COLOR_GREEN}${set_webserver_tls}${COLOR_END}"
+        if [ "${set_webserver_tls}" == "enable" ]; then
+        echo -e "TLS cert file      : ${COLOR_GREEN}${set_webserver_tls_cert_file}${COLOR_END}"
+        echo -e "TLS key file       : ${COLOR_GREEN}${set_webserver_tls_key_file}${COLOR_END}"
+        fi
         echo "=============================================="
         echo ""
         echo "Press any key to start...or Press Ctrl+c to cancel"
@@ -711,6 +800,29 @@ install_program_server_frps(){
 
     echo -n "config file for ${program_name} ..."
     
+# Build SSH Tunnel Gateway config lines
+if [ "${set_ssh_tunnel_gateway}" == "enable" ]; then
+    ssh_tunnel_config="sshTunnelGateway.bindPort = ${set_ssh_tunnel_gateway_bind_port}"
+    [ -n "${set_ssh_private_key_file}" ] && ssh_tunnel_config="${ssh_tunnel_config}
+sshTunnelGateway.privateKeyFile = \"${set_ssh_private_key_file}\""
+    [ -n "${set_ssh_authorized_keys_file}" ] && ssh_tunnel_config="${ssh_tunnel_config}
+sshTunnelGateway.authorizedKeysFile = \"${set_ssh_authorized_keys_file}\""
+else
+    ssh_tunnel_config="# sshTunnelGateway.bindPort = 2200
+# sshTunnelGateway.privateKeyFile = \"/home/frp-user/.ssh/id_rsa\"
+# sshTunnelGateway.autoGenPrivateKeyPath = \"\"
+# sshTunnelGateway.authorizedKeysFile = \"/home/frp-user/.ssh/authorized_keys\""
+fi
+
+# Build webServer TLS config lines
+if [ "${set_webserver_tls}" == "enable" ]; then
+    webserver_tls_config="webServer.tls.certFile = \"${set_webserver_tls_cert_file}\"
+webServer.tls.keyFile = \"${set_webserver_tls_key_file}\""
+else
+    webserver_tls_config="# webServer.tls.certFile = \"server.crt\"
+# webServer.tls.keyFile = \"server.key\""
+fi
+
 # Write the configuration to the frps config file
 
 cat << EOF > "${str_program_dir}/${program_config_file}"
@@ -782,8 +894,7 @@ webServer.addr = "0.0.0.0"
 webServer.port = ${set_dashboard_port}
 webServer.user = "${set_dashboard_user}"
 webServer.password = "${set_dashboard_pwd}"
-# webServer.tls.certFile = "server.crt"
-# webServer.tls.keyFile = "server.key"
+${webserver_tls_config}
 # dashboard assets directory(only for debug mode)
 # webServer.assetsDir = "./static"
 
@@ -795,7 +906,7 @@ webServer.password = "${set_dashboard_pwd}"
 # enablePrometheus = true
 
 # console or real logFile path like ./frps.log
-log.to = "${str_log_file_flag}"
+log.to = "${str_log_file}"
 # trace, debug, info, warn, error
 log.level = "${str_log_level}"
 log.maxDays = ${set_log_max_days}
@@ -841,10 +952,7 @@ subDomainHost = "${set_subdomain_host}"
 # ssh tunnel gateway
 # If you want to enable this feature, the bindPort parameter is required, while others are optional.
 # By default, this feature is disabled. It will be enabled if bindPort is greater than 0.
-# sshTunnelGateway.bindPort = 2200
-# sshTunnelGateway.privateKeyFile = "/home/frp-user/.ssh/id_rsa"
-# sshTunnelGateway.autoGenPrivateKeyPath = ""
-# sshTunnelGateway.authorizedKeysFile = "/home/frp-user/.ssh/authorized_keys"
+${ssh_tunnel_config}
 EOF
     echo " done"
 
@@ -881,9 +989,10 @@ EOF
 
 	# Start the frps service
 	${program_init} start
+	start_ret=$?
 
 	# Check if the frps service started successfully
-	if pgrep -x "${program_name}" >/dev/null; then
+	if [ ${start_ret} -eq 0 ]; then
 		echo "${program_name} service started successfully."
 		fun_frps
 		echo -e "${COLOR_GREEN}
@@ -930,13 +1039,15 @@ fi
     echo -e "kcp bind port      : ${COLOR_GREEN}${set_kcp_bind_port}${COLOR_END}"
     echo -e "quic bind port     : ${COLOR_GREEN}${set_quic_bind_port}${COLOR_END}"	
     echo "================================================"
-    echo -e "${program_name} Dashboard     : ${COLOR_GREEN}http://${set_subdomain_host}:${set_dashboard_port}/${COLOR_END}"
+    local dashboard_scheme="http"
+    [ "${set_webserver_tls}" = "enable" ] && dashboard_scheme="https"
+    echo -e "${program_name} Dashboard     : ${COLOR_GREEN}${dashboard_scheme}://${set_subdomain_host}:${set_dashboard_port}/${COLOR_END}"
     echo -e "Dashboard port     : ${COLOR_GREEN}${set_dashboard_port}${COLOR_END}"
     echo -e "Dashboard user     : ${COLOR_GREEN}${set_dashboard_user}${COLOR_END}"
     echo -e "Dashboard password : ${COLOR_GREEN}${set_dashboard_pwd}${COLOR_END}"
     echo "================================================"
     echo ""
-    echo -e "${program_name} status manage : ${COLOR_PINKBACK_WHITEFONT}${program_name}${COLOR_END} {${COLOR_GREEN}start|stop|restart|status|config|version${COLOR_END}}"
+    echo -e "${program_name} status manage : ${COLOR_PINKBACK_WHITEFONT}${program_name}${COLOR_END} {${COLOR_GREEN}start|stop|restart|status|info|config|version${COLOR_END}}"
     echo -e "Example:"
     echo -e "  start: ${COLOR_PINK}${program_name}${COLOR_END} ${COLOR_GREEN}start${COLOR_END}"
     echo -e "   stop: ${COLOR_PINK}${program_name}${COLOR_END} ${COLOR_GREEN}stop${COLOR_END}"
@@ -944,6 +1055,71 @@ fi
     exit 0
 }
 ############################### configure ##################################
+############################### info ##################################
+show_frps_info(){
+    local cfg="${str_program_dir}/${program_config_file}"
+    if [ ! -s "${cfg}" ]; then
+        echo "${program_name} configuration file not found!"
+        exit 1
+    fi
+
+    # Read values from TOML config file
+    local info_bind_port info_vhost_http info_vhost_https info_dashboard_port
+    local info_dashboard_user info_dashboard_pwd info_token info_subdomain
+    local info_tcp_mux info_max_pool info_log_level info_log_days info_log_to
+    local info_kcp_port info_quic_port
+
+    info_bind_port=$(grep -E '^bindPort\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_vhost_http=$(grep -E '^vhostHTTPPort\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_vhost_https=$(grep -E '^vhostHTTPSPort\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_dashboard_port=$(grep -E '^webServer\.port\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_dashboard_user=$(grep -E '^webServer\.user\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_dashboard_pwd=$(grep -E '^webServer\.password\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_token=$(grep -E '^auth\.token\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_subdomain=$(grep -E '^subDomainHost\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_tcp_mux=$(grep -E '^transport\.tcpMux\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_max_pool=$(grep -E '^transport\.maxPoolCount\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_log_level=$(grep -E '^log\.level\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_log_days=$(grep -E '^log\.maxDays\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_log_to=$(grep -E '^log\.to\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+    info_kcp_port=$(grep -E '^kcpBindPort\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    info_quic_port=$(grep -E '^quicBindPort\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' ')
+    local info_tls_cert
+    info_tls_cert=$(grep -E '^webServer\.tls\.certFile\s*=' "${cfg}" | awk -F'=' '{print $2}' | tr -d ' "')
+
+    local info_ip
+    info_ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
+
+    fun_frps
+    echo "Congratulations, ${program_name} configuration info:"
+    echo "================================================"
+    echo -e "You Server IP      : ${COLOR_GREEN}${info_ip}${COLOR_END}"
+    echo -e "bind port          : ${COLOR_GREEN}${info_bind_port}${COLOR_END}"
+    echo -e "vhost http port    : ${COLOR_GREEN}${info_vhost_http}${COLOR_END}"
+    echo -e "vhost https port   : ${COLOR_GREEN}${info_vhost_https}${COLOR_END}"
+    echo -e "token              : ${COLOR_GREEN}${info_token}${COLOR_END}"
+    echo -e "subdomain_host     : ${COLOR_GREEN}${info_subdomain}${COLOR_END}"
+    echo -e "tcp mux            : ${COLOR_GREEN}${info_tcp_mux}${COLOR_END}"
+    echo -e "Max Pool count     : ${COLOR_GREEN}${info_max_pool}${COLOR_END}"
+    echo -e "Log level          : ${COLOR_GREEN}${info_log_level}${COLOR_END}"
+    echo -e "Log max days       : ${COLOR_GREEN}${info_log_days}${COLOR_END}"
+    echo -e "Log file           : ${COLOR_GREEN}${info_log_to:+$([ "${info_log_to}" = "/dev/null" ] && echo disable || echo enable)}${COLOR_END}"
+    echo -e "transport protocol : ${COLOR_GREEN}${info_kcp_port:+enable}${info_kcp_port:-disable}${COLOR_END}"
+    echo -e "kcp bind port      : ${COLOR_GREEN}${info_kcp_port}${COLOR_END}"
+    echo -e "quic bind port     : ${COLOR_GREEN}${info_quic_port}${COLOR_END}"
+    echo "================================================"
+    local info_dashboard_scheme="http"
+    [ -n "${info_tls_cert}" ] && info_dashboard_scheme="https"
+    echo -e "${program_name} Dashboard     : ${COLOR_GREEN}${info_dashboard_scheme}://${info_subdomain:-${info_ip}}:${info_dashboard_port}/${COLOR_END}"
+    echo -e "Dashboard port     : ${COLOR_GREEN}${info_dashboard_port}${COLOR_END}"
+    echo -e "Dashboard user     : ${COLOR_GREEN}${info_dashboard_user}${COLOR_END}"
+    echo -e "Dashboard password : ${COLOR_GREEN}${info_dashboard_pwd}${COLOR_END}"
+    echo "================================================"
+    echo ""
+    echo -e "${program_name} status manage : ${COLOR_PINKBACK_WHITEFONT}${program_name}${COLOR_END} {${COLOR_GREEN}start|stop|restart|status|info|config|version${COLOR_END}}"
+    exit 0
+}
+############################### config ##################################
 configure_program_server_frps(){
     if [ -s ${str_program_dir}/${program_config_file} ]; then
         vi ${str_program_dir}/${program_config_file}
@@ -958,7 +1134,7 @@ uninstall_program_server_frps(){
     if [ -s ${program_init} ] || [ -s ${str_program_dir}/${program_name} ] ; then
         echo "============== Uninstall ${program_name} =============="
         str_uninstall="n"
-        echo -n -e "${COLOR_YELOW}You want to uninstall?${COLOR_END}"
+        echo -n -e "${COLOR_YELLOW}You want to uninstall?${COLOR_END}"
         read -e -p "[Y/N]:" str_uninstall
         case "${str_uninstall}" in
         [yY]|[yY][eE][sS])
@@ -991,96 +1167,34 @@ update_config_frps(){
     if [ ! -r "${str_program_dir}/${program_config_file}" ]; then
         echo "config file ${str_program_dir}/${program_config_file} not found."
     else
-        search_dashboard_user=`grep "dashboard_user" ${str_program_dir}/${program_config_file}`
-        search_dashboard_pwd=`grep "dashboard_pwd" ${str_program_dir}/${program_config_file}`
-        search_kcp_bind_port=`grep "kcp_bind_port" ${str_program_dir}/${program_config_file}`
-		search_quic_bind_port=`grep "quic_bind_port" ${str_program_dir}/${program_config_file}`
-        search_tcp_mux=`grep "tcp_mux" ${str_program_dir}/${program_config_file}`
-        search_token=`grep "privilege_token" ${str_program_dir}/${program_config_file}`
-        search_allow_ports=`grep "privilege_allow_ports" ${str_program_dir}/${program_config_file}`
-        if [ -z "${search_dashboard_user}" ] || [ -z "${search_dashboard_pwd}" ] || [ -z "${search_kcp_bind_port}" ] || [ -z "${search_quic_bind_port}" ] || [ -z "${search_tcp_mux}" ] || [ ! -z "${search_token}" ] || [ ! -z "${search_allow_ports}" ];then
+        # Use TOML field names that match the current config format
+        search_dashboard_user=$(grep "webServer.user" ${str_program_dir}/${program_config_file})
+        search_dashboard_pwd=$(grep "webServer.password" ${str_program_dir}/${program_config_file})
+        search_kcp_bind_port=$(grep "kcpBindPort" ${str_program_dir}/${program_config_file})
+        search_quic_bind_port=$(grep "quicBindPort" ${str_program_dir}/${program_config_file})
+        search_tcp_mux=$(grep "transport.tcpMux" ${str_program_dir}/${program_config_file})
+        # Check for legacy privilege_token (very old configs)
+        search_legacy_token=$(grep "privilege_token" ${str_program_dir}/${program_config_file})
+        search_legacy_allow_ports=$(grep "privilege_allow_ports" ${str_program_dir}/${program_config_file})
+        if [ -z "${search_dashboard_user}" ] || [ -z "${search_dashboard_pwd}" ] || [ -z "${search_kcp_bind_port}" ] || [ -z "${search_quic_bind_port}" ] || [ -z "${search_tcp_mux}" ] || [ -n "${search_legacy_token}" ] || [ -n "${search_legacy_allow_ports}" ]; then
             echo -e "${COLOR_GREEN}Configuration files need to be updated, now setting:${COLOR_END}"
             echo ""
-            if [ ! -z "${search_token}" ];then
+            if [ -n "${search_legacy_token}" ]; then
                 sed -i "s/privilege_token/token/" ${str_program_dir}/${program_config_file}
             fi
-            if [ -z "${search_dashboard_user}" ] && [ -z "${search_dashboard_pwd}" ];then
-                def_dashboard_user_update="admin"
-                read -e -p "Please input dashboard_user (Default: ${def_dashboard_user_update}):" set_dashboard_user_update
-                [ -z "${set_dashboard_user_update}" ] && set_dashboard_user_update="${def_dashboard_user_update}"
-                echo "${program_name} dashboard_user: ${set_dashboard_user_update}"
-                echo ""
-                def_dashboard_pwd_update=`fun_randstr 8`
-                read -e -p "Please input dashboard_pwd (Default: ${def_dashboard_pwd_update}):" set_dashboard_pwd_update
-                [ -z "${set_dashboard_pwd_update}" ] && set_dashboard_pwd_update="${def_dashboard_pwd_update}"
-                echo "${program_name} dashboard_pwd: ${set_dashboard_pwd_update}"
-                echo ""
-                sed -i "/dashboard_port =.*/a\dashboard_user = ${set_dashboard_user_update}\ndashboard_pwd = ${set_dashboard_pwd_update}\n" ${str_program_dir}/${program_config_file}
-            fi
-            if [ -z "${search_kcp_bind_port}" ];then 
-                echo -e "${COLOR_GREEN}Please select transport protocol support${COLOR_END}"
-                echo "1: enable (default)"
-                echo "2: disable"
-                echo "-------------------------"  
-                read -e -p "Enter your choice (1, 2 or exit. default [1]): " str_transport_protocol
-                case "${str_transport_protocol}" in
-                    1|[yY]|[yY][eE][sS]|[oO][nN]|[tT][rR][uU][eE]|[eE][nN][aA][bB][lL][eE])
-                        set_transport_protocol="enable"
-                        ;;
-                    0|2|[nN]|[nN][oO]|[oO][fF][fF]|[fF][aA][lL][sS][eE]|[dD][iI][sS][aA][bB][lL][eE])
-                        set_transport_protocol="disable"
-                        ;;
-                    [eE][xX][iI][tT])
-                        exit 1
-                        ;;
-                    *)
-                        set_transport_protocol="enable"
-                        ;;
-                esac
-                echo "transport protocol support: ${set_transport_protocol}"
-                def_kcp_bind_port=( $( __readINI ${str_program_dir}/${program_config_file} common bind_port ) )
-                if [[ "${set_transport_protocol}" == "disable" ]]; then
-                    sed -i "/^bind_port =.*/a\# udp port used for transport protocol, it can be same with 'bind_port'\n# if not set, transport protocol is disabled in frps\n#kcp_bind_port = ${def_kcp_bind_port}\n" ${str_program_dir}/${program_config_file}
-                else
-                    sed -i "/^bind_port =.*/a\# udp port used for transport protocol, it can be same with 'bind_port'\n# if not set, kcp is disabled in frps\nkcp_bind_port = ${def_kcp_bind_port}\n" ${str_program_dir}/${program_config_file}
-                fi
-            fi
-            if [ -z "${search_tcp_mux}" ];then
-                echo "# Please select tcp_mux "
-                echo "1: enable (default)"
-                echo "2: disable"
-                echo "-------------------------"  
-                read -e -p "Enter your choice (1, 2 or exit. default [1]): " str_tcp_mux
-                case "${str_tcp_mux}" in
-                    1|[yY]|[yY][eE][sS]|[oO][nN]|[tT][rR][uU][eE]|[eE][nN][aA][bB][lL][eE])
-                        set_tcp_mux="true"
-                        ;;
-                    0|2|[nN]|[nN][oO]|[oO][fF][fF]|[fF][aA][lL][sS][eE]|[dD][iI][sS][aA][bB][lL][eE])
-                        set_tcp_mux="false"
-                        ;;
-                    [eE][xX][iI][tT])
-                        exit 1
-                        ;;
-                    *)
-                        set_tcp_mux="true"
-                        ;;
-                esac
-                echo "tcp_mux: ${set_tcp_mux}"
-                sed -i "/^privilege_mode = true/d" ${str_program_dir}/${program_config_file}
-                sed -i "/^token =.*/a\# if tcp stream multiplexing is used, default is true\ntcp_mux = ${set_tcp_mux}\n" ${str_program_dir}/${program_config_file}
-            fi
-            if [ ! -z "${search_allow_ports}" ];then
+            if [ -n "${search_legacy_allow_ports}" ]; then
                 sed -i "s/privilege_allow_ports/allow_ports/" ${str_program_dir}/${program_config_file}
             fi
         fi
-        verify_dashboard_user=`grep "^dashboard_user" ${str_program_dir}/${program_config_file}`
-        verify_dashboard_pwd=`grep "^dashboard_pwd" ${str_program_dir}/${program_config_file}`
-        verify_kcp_bind_port=`grep "kcp_bind_port" ${str_program_dir}/${program_config_file}`
-		verify_quic_bind_port=`grep "quic_bind_port" ${str_program_dir}/${program_config_file}`
-        verify_tcp_mux=`grep "^tcp_mux" ${str_program_dir}/${program_config_file}`
-        verify_token=`grep "privilege_token" ${str_program_dir}/${program_config_file}`
-        verify_allow_ports=`grep "privilege_allow_ports" ${str_program_dir}/${program_config_file}`
-        if [ ! -z "${verify_dashboard_user}" ] && [ ! -z "${verify_dashboard_pwd}" ] && [ ! -z "${verify_kcp_bind_port}" ] && [ ! -z "${verify_tcp_mux}" ] && [ -z "${verify_token}" ] && [ -z "${verify_allow_ports}" ];then
+        # Verify TOML format fields are present
+        verify_dashboard_user=$(grep "webServer.user" ${str_program_dir}/${program_config_file})
+        verify_dashboard_pwd=$(grep "webServer.password" ${str_program_dir}/${program_config_file})
+        verify_kcp_bind_port=$(grep "kcpBindPort" ${str_program_dir}/${program_config_file})
+        verify_quic_bind_port=$(grep "quicBindPort" ${str_program_dir}/${program_config_file})
+        verify_tcp_mux=$(grep "transport.tcpMux" ${str_program_dir}/${program_config_file})
+        verify_legacy_token=$(grep "privilege_token" ${str_program_dir}/${program_config_file})
+        verify_legacy_allow_ports=$(grep "privilege_allow_ports" ${str_program_dir}/${program_config_file})
+        if [ -n "${verify_dashboard_user}" ] && [ -n "${verify_dashboard_pwd}" ] && [ -n "${verify_kcp_bind_port}" ] && [ -n "${verify_quic_bind_port}" ] && [ -n "${verify_tcp_mux}" ] && [ -z "${verify_legacy_token}" ] && [ -z "${verify_legacy_allow_ports}" ]; then
             echo -e "${COLOR_GREEN}update configuration file successfully!!!${COLOR_END}"
         else
             echo -e "${COLOR_RED}update configuration file error!!!${COLOR_END}"
@@ -1094,7 +1208,6 @@ update_program_server_frps() {
         echo "============== Update $program_name =============="
         update_config_frps
         checkos
-        check_os_version
         check_os_bit
         fun_getVer
 
@@ -1137,9 +1250,13 @@ update_program_server_frps() {
                 update-rc.d -f "$program_name" defaults
             fi
 
-            [ -s "$program_init" ] && ln -s "$program_init" /usr/bin/$program_name
+            [ -s "$program_init" ] && ln -sf "$program_init" /usr/bin/$program_name
             [ ! -x "$program_init" ] && chmod 755 "$program_init"
             "$program_init" start
+            if [ $? -ne 0 ]; then
+                echo -e "${COLOR_RED}$program_name failed to start after update!${COLOR_END}"
+                exit 1
+            fi
             echo "$program_name version $($str_program_dir/$program_name --version)"
             echo "$program_name update success!"
         else
@@ -1156,7 +1273,6 @@ strPath=$(pwd)
 rootness
 fun_set_text_color
 checkos
-check_os_version
 check_os_bit
 pre_install_packs
 shell_update
@@ -1166,7 +1282,7 @@ action=$1
 if [ -z "$action" ]; then
     fun_frps
     echo "Arguments error! [$action ]"
-    echo "Usage: $(basename "$0") {install|uninstall|update|config}"
+    echo "Usage: $(basename "$0") {install|uninstall|update|config|info}"
     RET_VAL=1
 else
     case "$action" in
@@ -1175,6 +1291,9 @@ else
         ;;
     config)
         configure_program_server_frps
+        ;;
+    info)
+        show_frps_info
         ;;
     uninstall)
         uninstall_program_server_frps 2>&1 | tee /root/${program_name}-uninstall.log
@@ -1185,7 +1304,7 @@ else
     *)
         fun_frps
         echo "Arguments error! [$action ]"
-        echo "Usage: $(basename "$0") {install|uninstall|update|config}"
+        echo "Usage: $(basename "$0") {install|uninstall|update|config|info}"
         RET_VAL=1
         ;;
     esac
