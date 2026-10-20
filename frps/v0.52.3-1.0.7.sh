@@ -1159,7 +1159,7 @@ checkos
 check_os_version
 check_os_bit
 pre_install_packs
-shell_update
+# shell_update
 
 # Initialization
 action=$1
