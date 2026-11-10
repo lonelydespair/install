@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 # ============================================================
-# frps 管理菜单
+# frps 一键管理菜单（单文件版）
 #
-# 作用：给固定版本的 frps 安装脚本套一个数字菜单
-# 依赖：固定好的安装脚本，放在 /etc/frps-menu/install-frps.sh
-# 说明：安装 / 卸载 / 升级 三件事仍然交给那份安装脚本完成，
-#       它的内容一个字节都没改。只有"改端口、改密码"这类
-#       小改动由本菜单直接改配置文件，并带自动回滚。
+# 用法：一条命令下载后直接运行，就会出现数字菜单。
+#      wget -O frps.sh <本文件地址> && chmod +x frps.sh && ./frps.sh
+#
+# 原理：本文件只负责"菜单"。真正的安装动作由固定版本的
+#       frps 安装脚本完成，它在第一次运行本菜单时会自动
+#       下载到本地并一直使用同一份，不会被上游更新替换。
+#
+# 也支持直接带参数（保留原来的用法）：
+#      ./frps.sh install | uninstall | update
 # ============================================================
 
+SELF_VERSION="1.0"
+
+# 固定版本的安装脚本：第一次运行自动下载，之后一直用本地这份
 INSTALLER="/etc/frps-menu/install-frps.sh"
+INSTALLER_URL_1="https://raw.githubusercontent.com/lonelydespair/install/main/frps/v0.52.3.sh"
+INSTALLER_URL_2="https://cdn.jsdelivr.net/gh/lonelydespair/install@main/frps/v0.52.3.sh"
+PINNED_VERSION="v0.52.3"
+
 CONF="/usr/local/frps/frps.toml"
 INIT="/etc/init.d/frps"
 BIN="/usr/local/frps/frps"
@@ -28,12 +39,51 @@ need_root() {
     fi
 }
 
-check_env() {
-    if [ ! -s "$INSTALLER" ]; then
-        echo -e "${RED}找不到固定版本的安装脚本：${INSTALLER}${END}"
-        echo "请先把那份脚本放到这个位置，再运行本菜单。"
-        exit 1
+fetch_file() {
+    # $1=地址 $2=保存到哪
+    if command -v wget >/dev/null 2>&1; then
+        wget -qO "$2" --no-check-certificate "$1" 2>/dev/null && [ -s "$2" ]
+    elif command -v curl >/dev/null 2>&1; then
+        curl -fsSL --insecure -o "$2" "$1" 2>/dev/null && [ -s "$2" ]
+    else
+        return 1
     fi
+}
+
+ensure_installer() {
+    # 已经准备好就直接用，不再联网
+    [ -s "$INSTALLER" ] && return 0
+
+    echo -e "${CYA}第一次运行，正在准备安装组件...${END}"
+    mkdir -p "$(dirname "$INSTALLER")" 2>/dev/null
+
+    if fetch_file "$INSTALLER_URL_1" "$INSTALLER" || fetch_file "$INSTALLER_URL_2" "$INSTALLER"; then
+        chmod 700 "$INSTALLER" 2>/dev/null
+        echo -e "${GRN}准备完成（固定版本 ${PINNED_VERSION}）。${END}"
+        sleep 1
+        return 0
+    fi
+
+    # 两条地址都失败：先补下载工具，再试一次
+    echo -e "${YEL}下载没成功，尝试安装下载工具后重试...${END}"
+    if command -v apt-get >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y wget >/dev/null 2>&1
+    fi
+    if fetch_file "$INSTALLER_URL_1" "$INSTALLER" || fetch_file "$INSTALLER_URL_2" "$INSTALLER"; then
+        chmod 700 "$INSTALLER" 2>/dev/null
+        echo -e "${GRN}准备完成（固定版本 ${PINNED_VERSION}）。${END}"
+        sleep 1
+        return 0
+    fi
+
+    echo -e "${RED}组件下载失败，菜单里的安装/卸载/升级暂时用不了。${END}"
+    echo "常见原因是这台机器连不上 GitHub。"
+    echo "可以先在能上网的机器上下载 ${PINNED_VERSION} 那份安装脚本，"
+    echo "上传到服务器的 ${INSTALLER} 位置，再重新运行本菜单。"
+    echo ""
+    echo "查看配置、查看状态、启停这些功能仍然可用。"
+    sleep 3
+    return 1
 }
 
 is_installed() {
@@ -47,6 +97,16 @@ is_running() {
 pause() {
     echo ""
     read -r -p "按回车返回..." _
+}
+
+have_installer() {
+    if [ -s "$INSTALLER" ]; then
+        return 0
+    fi
+    echo -e "${RED}安装组件不在本地，这一项现在用不了。${END}"
+    echo "（查看配置、查看状态、启停功能不受影响）"
+    pause
+    return 1
 }
 
 # ---------- 读写配置 ----------
@@ -192,6 +252,7 @@ show_status() {
 # ---------- 调用安装脚本 ----------
 do_install() {
     echo ""
+    have_installer || return
     if is_running; then
         echo -e "${YEL}已经在运行了，安装脚本不会重复安装。${END}"
         echo "想重新装，请用菜单里的「重新安装」。"
@@ -204,6 +265,7 @@ do_install() {
 
 do_reinstall() {
     echo ""
+    have_installer || return
     echo -e "${RED}重新安装会先删掉现有配置和连接密码。${END}"
     echo "删掉之后已经配好的隧道全部失效，连接密码会重新生成。"
     read -r -p "确定继续请输入 yes，其他任意键取消：" ok
@@ -221,6 +283,7 @@ do_reinstall() {
 
 do_update() {
     echo ""
+    have_installer || return
     if ! is_installed; then
         echo -e "${YEL}还没装，先安装。${END}"
         pause
@@ -236,6 +299,7 @@ do_update() {
 
 do_uninstall() {
     echo ""
+    have_installer || return
     if ! is_installed; then
         echo -e "${YEL}本来就没装。${END}"
         pause
@@ -370,6 +434,7 @@ menu() {
         echo ""
         echo -e "${CYA}+------------------------------------------------+${END}"
         echo -e "${CYA}|              frps 管理菜单                     |${END}"
+        echo -e "${CYA}|              安装版本固定 ${PINNED_VERSION}              |${END}"
         echo -e "${CYA}+------------------------------------------------+${END}"
         if is_running; then
             echo -e "  当前状态：${GRN}正在运行${END}   端口 $(conf_get bindPort)"
@@ -409,5 +474,18 @@ menu() {
 }
 
 need_root
-check_env
+ensure_installer
+
+# 保留原来的习惯用法：带参数就直接执行那件事
+case "${1:-}" in
+    install|uninstall|update)
+        if [ -s "$INSTALLER" ]; then
+            bash "$INSTALLER" "$1"
+            exit $?
+        fi
+        echo -e "${RED}安装组件不可用，无法执行 $1。${END}"
+        exit 1
+        ;;
+esac
+
 menu
