@@ -1,21 +1,4 @@
-#!/usr/bin/env bash
-# ============================================================
-# frps 一键管理菜单（单文件版）
-#
-# 用法：一条命令下载后直接运行，就会出现数字菜单。
-#      wget -O frps.sh <本文件地址> && chmod +x frps.sh && ./frps.sh
-#
-# 原理：本文件只负责"菜单"。真正的安装动作由固定版本的
-#       frps 安装脚本完成，它在第一次运行本菜单时会自动
-#       下载到本地并一直使用同一份，不会被上游更新替换。
-#
-# 也支持直接带参数（保留原来的用法）：
-#      ./frps.sh install | uninstall | update
-# ============================================================
-
-SELF_VERSION="1.0"
-
-# 固定版本的安装脚本：第一次运行自动下载，之后一直用本地这份
+SELF_VERSION="1.1"
 INSTALLER="/etc/frps-menu/install-frps.sh"
 INSTALLER_URL_1="https://raw.githubusercontent.com/lonelydespair/install/main/frps/v0.52.3.sh"
 INSTALLER_URL_2="https://cdn.jsdelivr.net/gh/lonelydespair/install@main/frps/v0.52.3.sh"
@@ -76,7 +59,7 @@ ensure_installer() {
         return 0
     fi
 
-    echo -e "${RED}组件下载失败，菜单里的安装/卸载/升级暂时用不了。${END}"
+    echo -e "${RED}组件下载失败，菜单里的安装/卸载暂时用不了。${END}"
     echo "常见原因是这台机器连不上 GitHub。"
     echo "可以先在能上网的机器上下载 ${PINNED_VERSION} 那份安装脚本，"
     echo "上传到服务器的 ${INSTALLER} 位置，再重新运行本菜单。"
@@ -97,6 +80,16 @@ is_running() {
 pause() {
     echo ""
     read -r -p "按回车返回..." _
+}
+
+# 危险操作前的确认：只认 y（y/yes 都算），其他一律取消
+confirm() {
+    local ok
+    read -r -p "$1，输入 y 确认，其他任意键取消：" ok
+    case "$ok" in
+        y|Y|yes|YES|Yes) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 have_installer() {
@@ -259,6 +252,9 @@ do_install() {
         pause
         return
     fi
+    echo -e "${YEL}安装过程中会问你从哪里下载：请选 2（GitHub）。${END}"
+    echo "选 1（Gitee 镜像）会装成另一个版本，版本锁定就失效了。"
+    echo ""
     bash "$INSTALLER" install
     pause
 }
@@ -268,8 +264,7 @@ do_reinstall() {
     have_installer || return
     echo -e "${RED}重新安装会先删掉现有配置和连接密码。${END}"
     echo "删掉之后已经配好的隧道全部失效，连接密码会重新生成。"
-    read -r -p "确定继续请输入 yes，其他任意键取消：" ok
-    if [ "$ok" != "yes" ]; then
+    if ! confirm "确定继续"; then
         echo "已取消。"
         pause
         return
@@ -278,22 +273,6 @@ do_reinstall() {
     echo ""
     echo "开始重新安装..."
     bash "$INSTALLER" install
-    pause
-}
-
-do_update() {
-    echo ""
-    have_installer || return
-    if ! is_installed; then
-        echo -e "${YEL}还没装，先安装。${END}"
-        pause
-        return
-    fi
-    echo -e "${YEL}提醒：升级会把程序换成新版本。${END}"
-    echo "现在这套是验证过能用的，换版本后可能需要重新检查隧道。"
-    read -r -p "确定升级请输入 yes，其他任意键取消：" ok
-    [ "$ok" = "yes" ] || { echo "已取消。"; pause; return; }
-    bash "$INSTALLER" update
     pause
 }
 
@@ -306,8 +285,7 @@ do_uninstall() {
         return
     fi
     echo -e "${RED}卸载会删掉程序、配置和连接密码，无法恢复。${END}"
-    read -r -p "确定卸载请输入 yes，其他任意键取消：" ok
-    [ "$ok" = "yes" ] || { echo "已取消。"; pause; return; }
+    confirm "确定卸载" || { echo "已取消。"; pause; return; }
     bash "$INSTALLER" uninstall
     pause
 }
@@ -385,8 +363,7 @@ chg_token() {
     echo ""
     echo -e "${YEL}连接密码是服务端和内网客户端之间的暗号，两边必须一致。${END}"
     echo "改了以后，所有内网机器都要同步改，否则连不上。"
-    read -r -p "确定要改请输入 yes，其他任意键取消：" ok
-    [ "$ok" = "yes" ] || { echo "已取消。"; pause; return; }
+    confirm "确定要改" || { echo "已取消。"; pause; return; }
     local v bak
     v=$(head -c 64 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 24)
     bak=$(backup_conf)
@@ -406,13 +383,13 @@ settings_menu() {
         clear
         echo ""
         echo -e "${CYA}+--------------------------------------+${END}"
-        echo -e "${CYA}|            修改设置                    |${END}"
+        echo -e "${CYA}|            修改设置                  |${END}"
         echo -e "${CYA}+--------------------------------------+${END}"
         echo ""
-        echo "  1. 改穿透主端口（内网机器连服务端用的）"
+        echo "  1. 穿透主端口  bind_port"
         echo "  2. 改面板端口"
         echo "  3. 改面板登录密码"
-        echo "  4. 换连接密码（所有客户端要同步改）"
+        echo "  4. 换连接密码  token"
         echo "  0. 返回"
         echo ""
         read -r -p "请输入数字 [0-4]：" c
@@ -449,13 +426,13 @@ menu() {
         echo "   3. 修改设置"
         echo "   4. 查看配置与连接密码"
         echo "   5. 查看运行状态"
-        echo "   6. 启动          7. 停止"
+        echo "   6. 启动"
+        echo "   7. 停止"
         echo "   8. 重启"
-        echo "   9. 升级程序"
-        echo "  10. 卸载"
+        echo "   9. 卸载"
         echo "   0. 退出"
         echo ""
-        read -r -p "请输入数字 [0-10]：" n
+        read -r -p "请输入数字 [0-9]：" n
         case "$n" in
             1) do_install ;;
             2) do_reinstall ;;
@@ -465,8 +442,7 @@ menu() {
             6) svc start ;;
             7) svc stop ;;
             8) svc restart ;;
-            9) do_update ;;
-            10) do_uninstall ;;
+            9) do_uninstall ;;
             0) clear; exit 0 ;;
             *) echo ""; echo "没有这个选项。"; sleep 1 ;;
         esac
